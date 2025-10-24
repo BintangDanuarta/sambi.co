@@ -212,8 +212,8 @@ export default function LandingPage() {
             <div>
               <h4 className="text-white font-semibold mb-4">Kontak</h4>
               <ul className="space-y-2 text-sm">
-                <li>Email: info@sambi.co</li>
-                <li>WhatsApp: +62 812 3456 7890</li>
+                <li>Email: bintang@satu.kop.id</li>
+                <li>WhatsApp: +62 856 270 0564</li>
               </ul>
             </div>
           </div>

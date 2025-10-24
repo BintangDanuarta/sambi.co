@@ -224,10 +224,10 @@ Front-End Developer untuk Sambi.co Platform
 ## 📞 Support
 
 Untuk pertanyaan atau dukungan, hubungi:
-- Email: info@sambi.co
-- WhatsApp: +62 812 3456 7890
+- Email: bintang@satu.kop.id
+- WhatsApp: +62 887 0976 3493
 
 ---
 
-Built with ❤️ for Indonesian Students
+by Orang Orang Senang Team
 
