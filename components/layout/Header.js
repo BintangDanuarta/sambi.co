@@ -1,10 +1,58 @@
 'use client'
 
 import { Search, Bell, Menu } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
+import { notificationsApi } from '@/lib/api'
 
 export default function Header({ title, subtitle, onMenuClick }) {
+  const router = useRouter()
+  const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
+  const [unreadCount, setUnreadCount] = useState(0)
+  
+  // Load unread notifications count
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      try {
+        const count = await notificationsApi.getUnreadCount()
+        setUnreadCount(count || 0)
+      } catch (error) {
+        // Silently fail, just don't show badge
+        setUnreadCount(0)
+      }
+    }
+    
+    if (user) {
+      loadUnreadCount()
+    }
+  }, [user])
+  
+  // Get user initials
+  const getInitials = (name) => {
+    if (!name) return '??'
+    const parts = name.split(' ')
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+    }
+    return name.substring(0, 2).toUpperCase()
+  }
+  
+  // Get user role label
+  const getRoleLabel = () => {
+    if (!user) return ''
+    if (user.role === 'klien' || user.roles_id === 2) return 'Client'
+    return 'Mahasiswa'
+  }
+  
+  const handleNotificationClick = () => {
+    if (user?.role === 'klien' || user?.roles_id === 2) {
+      router.push('/client/notifications')
+    } else {
+      router.push('/dashboard/notifications')
+    }
+  }
   
   return (
     <header className="bg-white border-b border-neutral-200 sticky top-0 z-30">
@@ -16,6 +64,7 @@ export default function Header({ title, subtitle, onMenuClick }) {
             <button 
               className="lg:hidden text-neutral-600 hover:text-neutral-900 p-2 -ml-2"
               onClick={onMenuClick}
+              aria-label="Toggle menu"
             >
               <Menu className="w-6 h-6" />
             </button>
@@ -42,24 +91,37 @@ export default function Header({ title, subtitle, onMenuClick }) {
             </div>
             
             {/* Mobile Search Button */}
-            <button className="xl:hidden p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors">
+            <button 
+              className="xl:hidden p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+              aria-label="Search"
+            >
               <Search className="w-5 h-5" />
             </button>
             
             {/* Notification */}
-            <button className="relative p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors">
+            <button 
+              className="relative p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+              onClick={handleNotificationClick}
+              aria-label="Notifications"
+            >
               <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-danger-500 rounded-full"></span>
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-danger-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             
             {/* Profile */}
             <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-neutral-200">
               <div className="text-right hidden md:block">
-                <p className="text-sm font-medium text-neutral-900">Client Demo</p>
-                <p className="text-xs text-neutral-500">PT Digital Indonesia</p>
+                <p className="text-sm font-medium text-neutral-900">
+                  {user?.fullName || user?.full_name || user?.username || 'User'}
+                </p>
+                <p className="text-xs text-neutral-500">{getRoleLabel()}</p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                CD
+                {getInitials(user?.fullName || user?.full_name || user?.username)}
               </div>
             </div>
           </div>

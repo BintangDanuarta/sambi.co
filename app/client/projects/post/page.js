@@ -9,6 +9,7 @@ import Textarea from '@/components/ui/Textarea'
 import Select from '@/components/ui/Select'
 import Button from '@/components/ui/Button'
 import { Upload, X, FileText, Calendar, DollarSign } from 'lucide-react'
+import { projectsApi } from '@/lib/api'
 
 export default function PostProjectPage() {
   const router = useRouter()
@@ -26,6 +27,7 @@ export default function PostProjectPage() {
     attachments: [],
   })
   const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState(false)
 
   const categories = [
     { value: 'design', label: 'Design & Creative' },
@@ -85,10 +87,57 @@ export default function PostProjectPage() {
     }
   }
 
-  const handleSubmit = () => {
-    // TODO: Submit to API
-    console.log('Submitting project:', formData)
-    router.push('/client/projects?posted=true')
+  const handleSubmit = async () => {
+    setLoading(true)
+    setErrors({})
+    
+    try {
+      // Validate data
+      if (!formData.title || !formData.description || !formData.category) {
+        setErrors({ api: 'Title, description, dan category harus diisi' })
+        setLoading(false)
+        return
+      }
+
+      const budgetMin = parseInt(formData.budgetMin)
+      const budgetMax = parseInt(formData.budgetMax)
+
+      if (isNaN(budgetMin) || isNaN(budgetMax)) {
+        setErrors({ api: 'Budget harus berupa angka yang valid' })
+        setLoading(false)
+        return
+      }
+
+      if (budgetMin <= 0 || budgetMax <= 0) {
+        setErrors({ api: 'Budget harus lebih dari 0' })
+        setLoading(false)
+        return
+      }
+
+      if (budgetMin > budgetMax) {
+        setErrors({ api: 'Budget minimum tidak boleh lebih besar dari budget maximum' })
+        setLoading(false)
+        return
+      }
+      
+      // Submit project to API
+      const projectData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        category: formData.category.trim(),
+        budget_min: budgetMin,
+        budget_max: budgetMax,
+      }
+      
+      await projectsApi.create(projectData)
+      
+      // Success - redirect to projects list
+      router.push('/client/projects?posted=true')
+    } catch (error) {
+      setErrors({ api: error.message || 'Gagal memposting proyek. Silakan coba lagi.' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const renderStepIndicator = () => (
@@ -377,12 +426,18 @@ export default function PostProjectPage() {
                 </p>
               </div>
 
+              {errors.api && (
+                <div className="p-4 bg-danger-50 border border-danger-200 rounded-lg">
+                  <p className="text-sm text-danger-800">{errors.api}</p>
+                </div>
+              )}
+
               <div className="flex gap-4">
-                <Button variant="ghost" className="flex-1" onClick={() => setStep(2)}>
+                <Button variant="ghost" className="flex-1" onClick={() => setStep(2)} disabled={loading}>
                   Kembali
                 </Button>
-                <Button className="flex-1" onClick={handleSubmit}>
-                  Post Proyek & Bayar Rp 25.000
+                <Button className="flex-1" onClick={handleSubmit} disabled={loading}>
+                  {loading ? 'Memposting...' : 'Post Proyek & Bayar Rp 25.000'}
                 </Button>
               </div>
             </div>

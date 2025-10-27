@@ -1,18 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Textarea from '@/components/ui/Textarea'
 import { Upload, X, FileText, Image as ImageIcon, CheckCircle } from 'lucide-react'
+import { projectsApi } from '@/lib/api'
 
 export default function UploadResultPage({ params }) {
   const router = useRouter()
+  const [projectId, setProjectId] = useState(null)
   const [files, setFiles] = useState([])
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  // Load params
+  useEffect(() => {
+    const loadParams = async () => {
+      const resolvedParams = await params
+      setProjectId(resolvedParams.id)
+    }
+    loadParams()
+  }, [params])
 
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files)
@@ -23,15 +35,35 @@ export default function UploadResultPage({ params }) {
     setFiles(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setIsSubmitting(true)
     
-    // TODO: Implement file upload to server
-    setTimeout(() => {
+    if (!projectId) {
+      setError('Project ID tidak ditemukan')
+      return
+    }
+
+    setIsSubmitting(true)
+    setError('')
+    
+    try {
+      // Create FormData for file upload
+      const formData = new FormData()
+      files.forEach((file) => {
+        formData.append('files', file)
+      })
+      formData.append('notes', notes)
+      
+      // Upload deliverables
+      await projectsApi.uploadDeliverables(projectId, formData)
+      
+      // Success - redirect to project detail
+      router.push(`/dashboard/projects/${projectId}`)
+    } catch (error) {
+      setError(error.message || 'Gagal mengupload file. Silakan coba lagi.')
+    } finally {
       setIsSubmitting(false)
-      router.push(`/dashboard/projects/${params.id}`)
-    }, 2000)
+    }
   }
 
   const getFileIcon = (fileName) => {
@@ -137,6 +169,13 @@ export default function UploadResultPage({ params }) {
                 <li>• Klien akan mereview hasil Anda dalam 1-3 hari kerja</li>
               </ul>
             </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="p-4 bg-danger-50 border border-danger-200 rounded-lg">
+                <p className="text-sm text-danger-800">{error}</p>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-4 pt-6 border-t border-neutral-200">

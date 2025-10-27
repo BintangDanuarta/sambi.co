@@ -1,70 +1,64 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Link from 'next/link'
-import { Search, Filter, Plus } from 'lucide-react'
+import { Search, Filter, Plus, Loader } from 'lucide-react'
+import { projectsApi } from '@/lib/api'
 
 export default function ProjectsPage() {
+  const [projects, setProjects] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
+
   const tabs = [
-    { id: 'all', label: 'Semua Proyek', count: 15 },
-    { id: 'active', label: 'Aktif', count: 3 },
-    { id: 'completed', label: 'Selesai', count: 12 },
-    { id: 'proposals', label: 'Proposal', count: 5 },
+    { id: 'all', label: 'Semua Proyek' },
+    { id: 'active', label: 'Aktif' },
+    { id: 'completed', label: 'Selesai' },
+    { id: 'applied', label: 'Proposal Saya' },
   ]
 
-  const projects = [
-    {
-      id: 1,
-      title: 'Redesign Landing Page E-Commerce',
-      client: 'PT Digital Indonesia',
-      category: 'Design',
-      budget: 'Rp 1.500.000',
-      deadline: '2025-11-15',
-      status: 'active',
-      description: 'Membutuhkan redesign untuk landing page e-commerce dengan fokus pada konversi dan user experience.',
-    },
-    {
-      id: 2,
-      title: 'Aplikasi Mobile untuk Manajemen Keuangan',
-      client: 'Startup FinTech',
-      category: 'Development',
-      budget: 'Rp 3.000.000',
-      deadline: '2025-11-30',
-      status: 'active',
-      description: 'Develop aplikasi mobile untuk manajemen keuangan pribadi dengan fitur tracking pengeluaran.',
-    },
-    {
-      id: 3,
-      title: 'Content Writing untuk Blog',
-      client: 'CV Media Online',
-      category: 'Writing',
-      budget: 'Rp 750.000',
-      deadline: '2025-11-10',
-      status: 'review',
-      description: '10 artikel SEO-friendly untuk blog dengan topik teknologi dan bisnis.',
-    },
-    {
-      id: 4,
-      title: 'Video Editing untuk YouTube Channel',
-      client: 'Content Creator',
-      category: 'Video',
-      budget: 'Rp 500.000',
-      deadline: '2025-10-28',
-      status: 'completed',
-      description: 'Edit 5 video untuk YouTube dengan durasi 10-15 menit per video.',
-    },
-    {
-      id: 5,
-      title: 'Social Media Management',
-      client: 'Startup E-Commerce',
-      category: 'Marketing',
-      budget: 'Rp 2.000.000',
-      deadline: '2025-11-20',
-      status: 'proposal',
-      description: 'Mengelola 3 platform social media (Instagram, TikTok, Twitter) selama 1 bulan.',
-    },
-  ]
+  useEffect(() => {
+    loadProjects()
+  }, [activeTab])
+
+  const loadProjects = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      
+      if (activeTab === 'applied') {
+        // Fetch user's applications
+        const applications = await projectsApi.getMyApplications()
+        setProjects(Array.isArray(applications) ? applications : [])
+      } else {
+        // Fetch user's owned/active projects
+        const params = {}
+        if (activeTab !== 'all') {
+          params.status = activeTab
+        }
+        const data = await projectsApi.getAll(params)
+        setProjects(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+      setError(error.message || 'Gagal memuat proyek')
+      setProjects([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredProjects = projects.filter(project => 
+    searchQuery === '' || 
+    project.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    project.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   const getStatusBadge = (status) => {
     const variants = {
@@ -72,8 +66,18 @@ export default function ProjectsPage() {
       completed: { variant: 'success', label: 'Selesai' },
       review: { variant: 'warning', label: 'Review' },
       proposal: { variant: 'neutral', label: 'Proposal' },
+      applied: { variant: 'neutral', label: 'Proposal' },
     }
     return variants[status] || variants.active
+  }
+
+  const formatBudget = (budget) => {
+    if (!budget) return 'Budget belum ditentukan'
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(budget)
   }
 
   return (
@@ -85,13 +89,15 @@ export default function ProjectsPage() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors
-                  ${tab.id === 'all' 
+                  ${activeTab === tab.id
                     ? 'bg-primary-600 text-white' 
                     : 'bg-white text-neutral-600 hover:bg-neutral-100'
                   }`}
               >
-                {tab.label} ({tab.count})
+                {tab.label}
+                {!loading && ` (${activeTab === tab.id ? filteredProjects.length : projects.length})`}
               </button>
             ))}
           </div>
@@ -112,86 +118,118 @@ export default function ProjectsPage() {
                 type="text"
                 placeholder="Cari proyek..."
                 className="bg-transparent border-none outline-none flex-1 text-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="outline">
+            <Button variant="outline" onClick={loadProjects}>
               <Filter className="w-4 h-4 mr-2" />
-              Filter
+              Refresh
             </Button>
           </div>
         </Card>
 
+        {/* Error State */}
+        {error && (
+          <Card className="bg-red-50 border-red-200">
+            <p className="text-red-600 text-sm">{error}</p>
+          </Card>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-12">
+            <Loader className="w-8 h-8 animate-spin text-primary-600" />
+          </div>
+        )}
+
         {/* Projects List */}
-        <div className="grid gap-6">
-          {projects.map((project) => {
-            const statusBadge = getStatusBadge(project.status)
-            return (
-              <Card key={project.id} hover>
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-neutral-900 mb-1">
-                          {project.title}
-                        </h3>
-                        <p className="text-sm text-neutral-500">{project.client}</p>
+        {!loading && filteredProjects.length > 0 && (
+          <div className="grid gap-6">
+            {filteredProjects.map((project) => {
+              const statusBadge = getStatusBadge(project.status)
+              return (
+                <Card key={project.id} hover>
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-neutral-900 mb-1">
+                            {project.title || project.nama_project || 'Untitled Project'}
+                          </h3>
+                          <p className="text-sm text-neutral-500">
+                            {project.client || 'Client'}
+                          </p>
+                        </div>
+                        <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
                       </div>
-                      <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+                      
+                      <p className="text-neutral-600 text-sm mb-4">
+                        {project.description || project.deskripsi || 'Tidak ada deskripsi'}
+                      </p>
+                      
+                      <div className="flex flex-wrap items-center gap-4 text-sm">
+                        {project.category && (
+                          <Badge variant="neutral">{project.category}</Badge>
+                        )}
+                        {project.deadline && (
+                          <span className="text-neutral-600">
+                            Deadline: <span className="font-medium">{new Date(project.deadline).toLocaleDateString('id-ID')}</span>
+                          </span>
+                        )}
+                        <span className="font-semibold text-primary-600">
+                          {formatBudget(project.budget || project.budget_min)}
+                        </span>
+                      </div>
                     </div>
                     
-                    <p className="text-neutral-600 text-sm mb-4">{project.description}</p>
-                    
-                    <div className="flex flex-wrap items-center gap-4 text-sm">
-                      <Badge variant="neutral">{project.category}</Badge>
-                      <span className="text-neutral-600">
-                        Deadline: <span className="font-medium">{new Date(project.deadline).toLocaleDateString('id-ID')}</span>
-                      </span>
-                      <span className="font-semibold text-primary-600">{project.budget}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex lg:flex-col gap-2">
-                    <Link href={`/dashboard/projects/${project.id}`} className="flex-1">
-                      <Button variant="outline" size="sm" className="w-full">
-                        Detail
-                      </Button>
-                    </Link>
-                    {project.status === 'active' && (
-                      <Link href={`/dashboard/projects/${project.id}/upload`} className="flex-1">
-                        <Button size="sm" className="w-full">
-                          Upload Hasil
+                    <div className="flex lg:flex-col gap-2">
+                      <Link href={`/dashboard/projects/${project.id}`} className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full">
+                          Detail
                         </Button>
                       </Link>
-                    )}
+                      {(project.status === 'active' || project.status === 'ditangani') && (
+                        <Link href={`/dashboard/projects/${project.id}/upload`} className="flex-1">
+                          <Button size="sm" className="w-full">
+                            Upload Hasil
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
+                </Card>
+              )
+            })}
+          </div>
+        )}
 
-        {/* Empty State (hidden when there are projects) */}
-        {projects.length === 0 && (
+        {/* Empty State */}
+        {!loading && filteredProjects.length === 0 && (
           <Card className="text-center py-12">
             <div className="w-20 h-20 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Search className="w-10 h-10 text-neutral-400" />
             </div>
             <h3 className="text-lg font-semibold text-neutral-900 mb-2">
-              Belum Ada Proyek
+              {searchQuery ? 'Tidak Ada Hasil' : 'Belum Ada Proyek'}
             </h3>
             <p className="text-neutral-600 mb-6">
-              Mulai cari proyek yang sesuai dengan keahlian Anda
+              {searchQuery 
+                ? 'Coba kata kunci lain untuk mencari proyek' 
+                : 'Mulai cari proyek yang sesuai dengan keahlian Anda'
+              }
             </p>
-            <Link href="/dashboard/projects/browse">
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Cari Proyek
-              </Button>
-            </Link>
+            {!searchQuery && (
+              <Link href="/dashboard/projects/browse">
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Cari Proyek
+                </Button>
+              </Link>
+            )}
           </Card>
         )}
       </div>
     </DashboardLayout>
   )
 }
-

@@ -33,3 +33,42 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# documentation & guides (keep only README.md)
+*_GUIDE.md
+*_SUMMARY.md
+*_STATUS.md
+*_COMPLETE.md
+*_FINAL.md
+*_APPLIED.md
+*_FIXED.md
+*_IMPROVEMENTS.md
+*_EXPLANATION.md
+*_ENDPOINTS.md
+*_CHECKLIST.md
+CURRENT_*.md
+MISSING_*.md
+FINAL_*.md
+
+# markdown folder
+/markdown/
+FIXES_*.md
+UPLOAD_*.md
+HEADER_*.md
+QUICK_*.md
+API_INTEGRATION_GUIDE.md
+CLIENT_DASHBOARD_*.md
+COMPONENT_SHOWCASE.md
+IMPLEMENTATION_SUMMARY.md
+NEW_FEATURES_GUIDE.md
+PAGES_GUIDE.md
+PROJECT_STRUCTURE.md
+QUICK_START.md
+UPDATES_SUMMARY.md
+START_HERE.md
+GETTING_STARTED.md
+WHAT_WAS_DONE.md
+INTEGRATION_*.md
+SETUP_CHECKLIST.md
+DEPLOYED_BACKEND.md
+🚀_START_HERE.md
+

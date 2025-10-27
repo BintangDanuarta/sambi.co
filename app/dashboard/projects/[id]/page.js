@@ -1,10 +1,11 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import Link from 'next/link'
 import { 
   Calendar, 
   DollarSign, 
@@ -13,12 +14,71 @@ import {
   Clock,
   MessageCircle,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Loader
 } from 'lucide-react'
+import { projectsApi } from '@/lib/api'
 
 export default function ProjectDetailPage({ params }) {
-  // Mock data - will be replaced with API call using params.id
-  const project = {
+  const [project, setProject] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  // Load project details from API
+  useEffect(() => {
+    const loadProject = async () => {
+      try {
+        setLoading(true)
+        const resolvedParams = await params
+        const data = await projectsApi.getById(resolvedParams.id)
+        setProject(data)
+      } catch (error) {
+        console.error('Failed to load project:', error)
+        setError(error.message || 'Gagal memuat detail proyek')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProject()
+  }, [params])
+
+  // Show loading state
+  if (loading) {
+    return (
+      <DashboardLayout title="Detail Proyek" subtitle="Loading...">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-neutral-600">Memuat detail proyek...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Show error state
+  if (error || !project) {
+    return (
+      <DashboardLayout title="Detail Proyek" subtitle="Error">
+        <Card>
+          <div className="text-center py-12">
+            <AlertCircle className="w-16 h-16 text-danger-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+              Gagal Memuat Proyek
+            </h3>
+            <p className="text-neutral-600 mb-4">{error || 'Proyek tidak ditemukan'}</p>
+            <Link href="/dashboard/projects/browse">
+              <Button>Kembali ke Daftar Proyek</Button>
+            </Link>
+          </div>
+        </Card>
+      </DashboardLayout>
+    )
+  }
+
+  // Dummy project data for fallback
+  const dummyProject = {
     id: params.id,
     title: 'Redesign Landing Page E-Commerce',
     client: {
@@ -84,7 +144,9 @@ export default function ProjectDetailPage({ params }) {
         <Card>
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-neutral-900 mb-2">{project.title}</h1>
+              <h1 className="text-2xl font-bold text-neutral-900 mb-2">
+                {project.title || project.nama_project || 'Untitled Project'}
+              </h1>
               <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
             </div>
             <div className="flex gap-2">
@@ -103,18 +165,20 @@ export default function ProjectDetailPage({ params }) {
           </div>
 
           {/* Progress */}
-          <div className="mt-6">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-neutral-600 font-medium">Progress Proyek</span>
-              <span className="font-bold text-primary-600">{project.progress}%</span>
+          {project.progress !== undefined && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-neutral-600 font-medium">Progress Proyek</span>
+                <span className="font-bold text-primary-600">{project.progress}%</span>
+              </div>
+              <div className="w-full bg-neutral-200 rounded-full h-3">
+                <div 
+                  className="bg-primary-600 h-3 rounded-full transition-all" 
+                  style={{ width: `${project.progress}%` }}
+                ></div>
+              </div>
             </div>
-            <div className="w-full bg-neutral-200 rounded-full h-3">
-              <div 
-                className="bg-primary-600 h-3 rounded-full transition-all" 
-                style={{ width: `${project.progress}%` }}
-              ></div>
-            </div>
-          </div>
+          )}
         </Card>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -123,24 +187,31 @@ export default function ProjectDetailPage({ params }) {
             {/* Description */}
             <Card>
               <h2 className="text-lg font-semibold text-neutral-900 mb-4">Deskripsi Proyek</h2>
-              <p className="text-neutral-600 leading-relaxed mb-6">{project.description}</p>
+              <p className="text-neutral-600 leading-relaxed mb-6">
+                {project.description || project.deskripsi || 'Tidak ada deskripsi'}
+              </p>
               
-              <h3 className="text-md font-semibold text-neutral-900 mb-3">Requirements:</h3>
-              <ul className="space-y-2">
-                {project.requirements.map((req, index) => (
-                  <li key={index} className="flex items-start gap-2 text-neutral-600">
-                    <CheckCircle className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" />
-                    <span>{req}</span>
-                  </li>
-                ))}
-              </ul>
+              {project.requirements && project.requirements.length > 0 && (
+                <>
+                  <h3 className="text-md font-semibold text-neutral-900 mb-3">Requirements:</h3>
+                  <ul className="space-y-2">
+                    {project.requirements.map((req, index) => (
+                      <li key={index} className="flex items-start gap-2 text-neutral-600">
+                        <CheckCircle className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" />
+                        <span>{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </Card>
 
             {/* Milestones */}
-            <Card>
-              <h2 className="text-lg font-semibold text-neutral-900 mb-4">Milestone</h2>
-              <div className="space-y-4">
-                {project.milestones.map((milestone, index) => (
+            {project.milestones && project.milestones.length > 0 && (
+              <Card>
+                <h2 className="text-lg font-semibold text-neutral-900 mb-4">Milestone</h2>
+                <div className="space-y-4">
+                  {project.milestones.map((milestone, index) => (
                   <div key={milestone.id} className="flex items-start gap-4">
                     <div className="relative">
                       {getMilestoneIcon(milestone.status)}
@@ -159,15 +230,17 @@ export default function ProjectDetailPage({ params }) {
                       {milestone.status === 'completed' ? 'Selesai' : milestone.status === 'in-progress' ? 'Sedang Dikerjakan' : 'Pending'}
                     </Badge>
                   </div>
-                ))}
-              </div>
-            </Card>
+                  ))}
+                </div>
+              </Card>
+            )}
 
             {/* Deliverables */}
-            <Card>
-              <h2 className="text-lg font-semibold text-neutral-900 mb-4">File Deliverable</h2>
-              <div className="space-y-3">
-                {project.deliverables.map((file, index) => (
+            {project.deliverables && project.deliverables.length > 0 && (
+              <Card>
+                <h2 className="text-lg font-semibold text-neutral-900 mb-4">File Deliverable</h2>
+                <div className="space-y-3">
+                  {project.deliverables.map((file, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <FileText className="w-5 h-5 text-neutral-400" />
@@ -184,9 +257,10 @@ export default function ProjectDetailPage({ params }) {
                       <Badge variant="neutral" size="sm">Pending</Badge>
                     )}
                   </div>
-                ))}
-              </div>
-            </Card>
+                  ))}
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -195,42 +269,69 @@ export default function ProjectDetailPage({ params }) {
             <Card>
               <h3 className="font-semibold text-neutral-900 mb-4">Informasi Proyek</h3>
               <div className="space-y-4">
-                <div className="flex items-center gap-3 text-sm">
-                  <DollarSign className="w-5 h-5 text-neutral-400" />
-                  <div>
-                    <p className="text-neutral-500">Budget</p>
-                    <p className="font-semibold text-neutral-900">{project.budget}</p>
+                {(project.budget || project.budget_min) && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <DollarSign className="w-5 h-5 text-neutral-400" />
+                    <div>
+                      <p className="text-neutral-500">Budget</p>
+                      <p className="font-semibold text-neutral-900">
+                        {project.budget || 
+                          (project.budget_min && project.budget_max 
+                            ? `Rp ${project.budget_min.toLocaleString('id-ID')} - Rp ${project.budget_max.toLocaleString('id-ID')}`
+                            : project.budget_min 
+                            ? `Rp ${project.budget_min.toLocaleString('id-ID')}`
+                            : 'Belum ditentukan'
+                          )
+                        }
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <Calendar className="w-5 h-5 text-neutral-400" />
-                  <div>
-                    <p className="text-neutral-500">Deadline</p>
-                    <p className="font-semibold text-neutral-900">
-                      {new Date(project.deadline).toLocaleDateString('id-ID')}
-                    </p>
+                )}
+                {project.deadline && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <Calendar className="w-5 h-5 text-neutral-400" />
+                    <div>
+                      <p className="text-neutral-500">Deadline</p>
+                      <p className="font-semibold text-neutral-900">
+                        {new Date(project.deadline).toLocaleDateString('id-ID')}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <Clock className="w-5 h-5 text-neutral-400" />
-                  <div>
-                    <p className="text-neutral-500">Mulai</p>
-                    <p className="font-semibold text-neutral-900">
-                      {new Date(project.startDate).toLocaleDateString('id-ID')}
-                    </p>
+                )}
+                {project.startDate && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <Clock className="w-5 h-5 text-neutral-400" />
+                    <div>
+                      <p className="text-neutral-500">Mulai</p>
+                      <p className="font-semibold text-neutral-900">
+                        {new Date(project.startDate).toLocaleDateString('id-ID')}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
+                {project.created_at && !project.startDate && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <Clock className="w-5 h-5 text-neutral-400" />
+                    <div>
+                      <p className="text-neutral-500">Dibuat</p>
+                      <p className="font-semibold text-neutral-900">
+                        {new Date(project.created_at).toLocaleDateString('id-ID')}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
 
             {/* Client Info */}
-            <Card>
-              <h3 className="font-semibold text-neutral-900 mb-4">Informasi Klien</h3>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white font-semibold">
-                  {project.client.avatar}
-                </div>
-                <div>
+            {project.client && (
+              <Card>
+                <h3 className="font-semibold text-neutral-900 mb-4">Informasi Klien</h3>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white font-semibold">
+                    {project.client.avatar || project.client.name?.substring(0, 2).toUpperCase() || 'CL'}
+                  </div>
+                  <div>
                   <p className="font-semibold text-neutral-900">{project.client.name}</p>
                   <div className="flex items-center gap-2 text-sm text-neutral-600">
                     <span>⭐ {project.client.rating}</span>
@@ -245,7 +346,8 @@ export default function ProjectDetailPage({ params }) {
                   Kirim Pesan
                 </Button>
               </Link>
-            </Card>
+              </Card>
+            )}
 
             {/* Quick Actions */}
             <Card>

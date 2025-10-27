@@ -1,3 +1,6 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
@@ -12,10 +15,49 @@ import {
   Star,
   Calendar
 } from 'lucide-react'
+import { projectsApi, userApi } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function DashboardPage() {
-  // Mock data - will be replaced with API calls
-  const stats = [
+  const { user } = useAuth()
+  const [stats, setStats] = useState(null)
+  const [activeProjects, setActiveProjects] = useState([])
+  const [recentActivities, setRecentActivities] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  // Load dashboard data
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        setLoading(true)
+        
+        // Fetch user stats and projects in parallel
+        const [statsData, projectsData] = await Promise.all([
+          userApi.getStats().catch(() => null),
+          projectsApi.getAll({ status: 'active', limit: 3 }).catch(() => [])
+        ])
+        
+        if (statsData) setStats(statsData)
+        if (projectsData) setActiveProjects(Array.isArray(projectsData) ? projectsData : [])
+        
+      } catch (error) {
+        console.error('Failed to load dashboard:', error)
+        setError(error.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user) {
+      loadDashboard()
+    } else {
+      setLoading(false)
+    }
+  }, [user])
+
+  // Dummy data for fallback
+  const dummyStats = [
     {
       label: 'Total Pendapatan',
       value: 'Rp 5.250.000',
@@ -46,7 +88,7 @@ export default function DashboardPage() {
     },
   ]
 
-  const activeProjects = [
+  const dummyActiveProjects = [
     {
       id: 1,
       title: 'Redesign Landing Page E-Commerce',
@@ -76,7 +118,7 @@ export default function DashboardPage() {
     },
   ]
 
-  const recentActivities = [
+  const dummyRecentActivities = [
     {
       type: 'project_accepted',
       message: 'Proposal Anda untuk "Redesign Landing Page" diterima',
@@ -113,12 +155,28 @@ export default function DashboardPage() {
     },
   ]
 
+  // Use API data if available, otherwise use dummy data
+  const displayStats = stats || dummyStats
+  const displayProjects = activeProjects.length > 0 ? activeProjects : dummyActiveProjects
+  const displayActivities = recentActivities.length > 0 ? recentActivities : dummyRecentActivities
+
   return (
-    <DashboardLayout title="Dashboard" subtitle="Selamat datang kembali, Mahasiswa Demo!">
+    <DashboardLayout 
+      title="Dashboard" 
+      subtitle={`Selamat datang kembali, ${user?.fullName || 'Mahasiswa'}!`}
+    >
       <div className="space-y-6">
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-neutral-600">Memuat dashboard...</p>
+          </div>
+        )}
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => {
+          {displayStats.map((stat, index) => {
             const Icon = stat.icon
             return (
               <Card key={index} hover>
@@ -152,7 +210,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="space-y-4">
-                {activeProjects.map((project) => (
+                {displayProjects.map((project) => (
                   <Card key={project.id} className="border border-neutral-200" padding="normal">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -197,7 +255,7 @@ export default function DashboardPage() {
             <Card>
               <h2 className="text-xl font-semibold text-neutral-900 mb-4">Aktivitas Terbaru</h2>
               <div className="space-y-4">
-                {recentActivities.map((activity, index) => (
+                {displayActivities.map((activity, index) => (
                   <div key={index} className="flex gap-3">
                     <div className="w-2 h-2 bg-primary-600 rounded-full mt-2"></div>
                     <div className="flex-1">

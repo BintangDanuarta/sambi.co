@@ -2,6 +2,27 @@
 
 Platform freelance yang menghubungkan mahasiswa berbakat dengan klien yang membutuhkan jasa profesional. Dibangun dengan Next.js, Tailwind CSS, dan fokus pada pengalaman pengguna yang modern dan intuitif.
 
+---
+
+## 🌐 Backend Deployed!
+
+**Backend URL:** https://sambi-be.vercel.app/api ✅
+
+Your backend is already deployed and running! You only need to start the frontend.
+
+### ⚡ Quick Start (1 Minute)
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:3000 - Done! 🎉
+
+📖 **Read:** [QUICK_START_DEPLOYED.md](QUICK_START_DEPLOYED.md) for detailed instructions.
+
+---
+
 ## 🚀 Fitur Utama
 
 ### Untuk Freelancer (Mahasiswa)
@@ -20,10 +41,21 @@ Platform freelance yang menghubungkan mahasiswa berbakat dengan klien yang membu
 
 ## 🛠️ Tech Stack
 
+### Frontend
 - **Framework**: Next.js 16 (App Router)
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
 - **Language**: JavaScript (ES6+)
+- **Real-time**: Socket.io Client
+
+### Backend
+- **Runtime**: Node.js
+- **Framework**: Express.js
+- **Database**: MySQL
+- **Authentication**: JWT (jsonwebtoken)
+- **File Upload**: Multer + Cloudinary
+- **Real-time**: Socket.io
+- **Payment**: Tripay Integration
 
 ## 📁 Struktur Proyek
 
@@ -92,36 +124,91 @@ Semua komponen UI telah dibuat dengan reusable dan customizable:
 ## 🚦 Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
-- npm atau yarn
+- **Node.js** 18+ 
+- **npm** atau **yarn**
+- **MySQL** 5.7+ atau 8.0+
+- **Git**
+
+### Quick Start (5 Minutes)
+
+**Read this first**: 📖 [START_HERE.md](START_HERE.md)
 
 ### Installation
 
-1. Clone repository
+1. **Clone repository**
 ```bash
 git clone <repository-url>
 cd sambi-co
 ```
 
-2. Install dependencies
+2. **Install dependencies**
 ```bash
+# Frontend dependencies
 npm install
+
+# Backend dependencies
+cd backend
+npm install
+cd ..
 ```
 
-3. Run development server
+3. **Setup Database**
+```bash
+mysql -u root -p
+```
+```sql
+CREATE DATABASE sambi_db;
+USE sambi_db;
+source backend/sambi.sql;
+exit;
+```
+
+4. **Configure Environment**
+
+Copy and edit environment files:
+```bash
+# Backend configuration
+cp backend/env-template.txt backend/.env
+# Edit backend/.env with your MySQL credentials
+
+# Frontend configuration
+cp env-template.txt .env.local
+# Use default values or customize
+```
+
+5. **Run the application**
+
+**Option A: Manual (2 terminals)**
+
+Terminal 1 - Backend:
+```bash
+cd backend
+npm run dev
+```
+
+Terminal 2 - Frontend:
 ```bash
 npm run dev
 ```
 
-4. Open browser
+**Option B: PowerShell Script (Windows)**
+```bash
+powershell -ExecutionPolicy Bypass -File start.ps1
 ```
-http://localhost:3000
-```
+
+6. **Open browser**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:5000/api
 
 ### Build for Production
 
 ```bash
+# Frontend
 npm run build
+npm start
+
+# Backend
+cd backend
 npm start
 ```
 
@@ -183,12 +270,15 @@ Semua halaman telah didesain responsif untuk:
 - [x] Wallet interface
 - [x] Notifications system
 
-### Phase 2 - Backend Integration
-- [ ] API integration dengan backend
-- [ ] Real authentication system
-- [ ] Database integration
-- [ ] File upload functionality
-- [ ] Payment gateway integration
+### Phase 2 - Backend Integration ✅
+- [x] API integration dengan backend
+- [x] Real authentication system (JWT)
+- [x] Database integration (MySQL)
+- [x] File upload functionality (Cloudinary)
+- [x] Payment gateway integration (Tripay)
+- [x] Socket.io for real-time features
+- [x] CORS configuration
+- [x] Complete API endpoints
 
 ### Phase 3 - Advanced Features
 - [ ] Real-time messaging
@@ -219,7 +309,45 @@ Front-End Developer untuk Sambi.co Platform
 
 ---
 
-**Note**: Ini adalah versi front-end. API integration dan backend functionality akan ditambahkan di fase berikutnya.
+## 📚 Documentation
+
+- **[START_HERE.md](START_HERE.md)** - Quick start guide (5 minutes)
+- **[INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md)** - Complete integration documentation
+- **[API_INTEGRATION_GUIDE.md](API_INTEGRATION_GUIDE.md)** - API usage guide
+- **[COMPONENT_SHOWCASE.md](COMPONENT_SHOWCASE.md)** - UI components guide
+
+## 🔌 API Endpoints
+
+The backend provides these endpoints:
+
+### Authentication
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - User login
+- `GET /api/auth/me` - Get current user
+- `POST /api/auth/logout` - User logout
+
+### Projects
+- `GET /api/projects` - List all projects
+- `GET /api/projects/:id` - Get project details
+- `POST /api/projects` - Create project
+- `POST /api/projects/:id/apply` - Apply to project
+- `GET /api/projects/:id/proposals` - Get proposals
+- `POST /api/projects/:id/proposals/:proposalId/accept` - Accept proposal
+
+### Users
+- `GET /api/user/:id` - Get user profile
+- `PUT /api/user/:id` - Update profile
+- `POST /api/user/:id/avatar` - Upload avatar
+
+### Payments
+- `POST /api/payment/intent` - Create payment
+- `POST /api/payment/tripay/callback` - Payment webhook
+
+See [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) for complete API documentation.
+
+---
+
+**Note**: ✅ Backend integration complete! The application is now a full-stack platform with real authentication, database, and payment integration.
 
 ## 📞 Support
 

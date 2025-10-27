@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { 
   Home,
   Briefcase, 
@@ -11,9 +12,26 @@ import {
   Menu,
   X
 } from 'lucide-react'
+import { notificationsApi } from '@/lib/api'
 
 export default function ClientSidebar({ isOpen, onClose }) {
   const pathname = usePathname()
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
+  
+  // Load unread notifications count
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      try {
+        const count = await notificationsApi.getUnreadCount()
+        setUnreadNotifications(count || 0)
+      } catch (error) {
+        // Silently fail
+        setUnreadNotifications(0)
+      }
+    }
+    
+    loadUnreadCount()
+  }, [])
   
   const menuItems = [
     { 
@@ -31,7 +49,7 @@ export default function ClientSidebar({ isOpen, onClose }) {
       icon: Bell, 
       label: 'Notifikasi', 
       href: '/client/notifications',
-      badge: 5
+      badge: unreadNotifications
     },
     { 
       icon: Settings, 
@@ -92,7 +110,7 @@ export default function ClientSidebar({ isOpen, onClose }) {
       <nav className="flex-1 px-3 space-y-1">
         {menuItems.map((item, index) => {
           const Icon = item.icon
-          const isActive = pathname === item.href
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           const isHighlight = item.highlight
           
           return (
@@ -114,9 +132,9 @@ export default function ClientSidebar({ isOpen, onClose }) {
                 <Icon className="w-5 h-5" />
                 <span>{item.label}</span>
               </div>
-              {item.badge && (
-                <span className="bg-danger-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                  {item.badge}
+              {item.badge > 0 && (
+                <span className="bg-danger-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                  {item.badge > 9 ? '9+' : item.badge}
                 </span>
               )}
             </Link>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
@@ -19,29 +19,100 @@ import {
   Briefcase,
   Upload
 } from 'lucide-react'
+import { userApi, authApi } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function ProfilePage() {
+  const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({
-    fullName: 'Mahasiswa Demo',
-    email: 'mahasiswa@demo.com',
-    phone: '+62 812 3456 7890',
-    university: 'Universitas Indonesia',
-    major: 'Teknik Informatika',
-    semester: '6',
-    bio: 'Saya adalah mahasiswa Teknik Informatika dengan passion di bidang UI/UX Design dan Web Development. Memiliki pengalaman 2 tahun dalam freelancing dan telah menyelesaikan 12 proyek dengan rating rata-rata 4.8.',
-    skills: 'UI/UX Design, Figma, React.js, Next.js, Tailwind CSS',
-    portfolio: 'https://portfolio.demo.com',
+    fullName: '',
+    email: '',
+    phone: '',
+    university: '',
+    major: '',
+    semester: '',
+    bio: '',
+    skills: '',
+    portfolio: '',
   })
+  const [loading, setLoading] = useState(false)
+  const [loadingData, setLoadingData] = useState(true)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  // Load user profile on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) {
+        setLoadingData(false)
+        return
+      }
+
+      try {
+        // Try to get profile from API first
+        const profileData = await userApi.getProfile()
+        
+        setFormData({
+          fullName: profileData.fullName || user.fullName || '',
+          email: profileData.email || user.email || '',
+          phone: profileData.phone || user.phone || '',
+          university: profileData.university || user.university || '',
+          major: profileData.major || user.major || '',
+          semester: profileData.semester || user.semester || '',
+          bio: profileData.bio || user.bio || '',
+          skills: profileData.skills || user.skills || '',
+          portfolio: profileData.portfolio || user.portfolio || '',
+        })
+      } catch (error) {
+        console.error('Failed to load profile:', error)
+        // Fallback to user from localStorage/context
+        if (user) {
+          setFormData({
+            fullName: user.fullName || '',
+            email: user.email || '',
+            phone: user.phone || '',
+            university: user.university || '',
+            major: user.major || '',
+            semester: user.semester || '',
+            bio: user.bio || '',
+            skills: user.skills || '',
+            portfolio: user.portfolio || '',
+          })
+        }
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    loadProfile()
+  }, [user])
 
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSave = () => {
-    // TODO: Implement save profile API
-    setIsEditing(false)
+  const handleSave = async () => {
+    setLoading(true)
+    setError('')
+    setSuccess(false)
+    
+    try {
+      // Update profile via API
+      await userApi.updateProfile(formData)
+      
+      // Success
+      setSuccess(true)
+      setIsEditing(false)
+      
+      // Hide success message after 3 seconds
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (error) {
+      setError(error.message || 'Gagal menyimpan profil. Silakan coba lagi.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const stats = [
@@ -98,6 +169,20 @@ export default function ProfilePage() {
     },
   ]
 
+  // Show loading state
+  if (loadingData) {
+    return (
+      <DashboardLayout title="Profil" subtitle="Kelola informasi profil Anda">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-neutral-600">Memuat profil...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout title="Profil" subtitle="Kelola informasi profil Anda">
       <div className="space-y-6">
@@ -131,9 +216,10 @@ export default function ProfilePage() {
                 <Button 
                   variant={isEditing ? 'primary' : 'outline'}
                   onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+                  disabled={loading}
                 >
                   <Edit className="w-4 h-4 mr-2" />
-                  {isEditing ? 'Simpan' : 'Edit Profil'}
+                  {loading ? 'Menyimpan...' : (isEditing ? 'Simpan' : 'Edit Profil')}
                 </Button>
               </div>
 
@@ -162,6 +248,20 @@ export default function ProfilePage() {
               <h3 className="text-lg font-semibold text-neutral-900 mb-4">
                 Informasi Pribadi
               </h3>
+
+              {/* Success Message */}
+              {success && (
+                <div className="mb-4 p-4 bg-success-50 border border-success-200 rounded-lg">
+                  <p className="text-sm text-success-800">✓ Profil berhasil diperbarui!</p>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {error && (
+                <div className="mb-4 p-4 bg-danger-50 border border-danger-200 rounded-lg">
+                  <p className="text-sm text-danger-800">{error}</p>
+                </div>
+              )}
               
               <div className="space-y-4">
                 {isEditing ? (

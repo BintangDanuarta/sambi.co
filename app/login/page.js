@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { Mail, Lock, ArrowLeft } from 'lucide-react'
+import { authApi } from '@/lib/api'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,8 +15,9 @@ export default function LoginPage() {
     password: '',
   })
   const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     // Basic validation
     const newErrors = {}
@@ -27,8 +29,44 @@ export default function LoginPage() {
       return
     }
     
-    // TODO: Implement actual login logic with API
-    router.push('/dashboard')
+    // Login with API
+    setLoading(true)
+    try {
+      const response = await authApi.login({
+        email: formData.email,
+        password: formData.password
+      })
+      
+      // Store token and user data
+      if (response.token) {
+        localStorage.setItem('token', response.token)
+      }
+      
+      // Backend might return user directly or in nested object
+      const userData = response.user || response
+      
+      // Map roles_id to role string (backend uses roles_id: 1=mahasiswa, 2=klien)
+      if (userData && userData.roles_id) {
+        userData.role = userData.roles_id === 2 ? 'klien' : 'mahasiswa'
+      }
+      
+      if (userData) {
+        localStorage.setItem('user', JSON.stringify(userData))
+      }
+      
+      // Redirect based on role
+      const userRole = userData?.role || (userData?.roles_id === 2 ? 'klien' : 'mahasiswa')
+      
+      if (userRole === 'klien') {
+        router.push('/client/dashboard')
+      } else {
+        router.push('/dashboard')
+      }
+    } catch (error) {
+      setErrors({ api: error.message || 'Login gagal. Periksa email dan password Anda.' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleChange = (e) => {
@@ -98,8 +136,14 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <Button type="submit" className="w-full" size="lg">
-              Masuk
+            {errors.api && (
+              <div className="p-4 bg-danger-50 border border-danger-200 rounded-lg">
+                <p className="text-sm text-danger-800">{errors.api}</p>
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              {loading ? 'Masuk...' : 'Masuk'}
             </Button>
           </form>
 

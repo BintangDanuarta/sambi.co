@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test - Sambi.co</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0284c7;
+        }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .success { color: #22c55e; }
+        .error { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <h1>🧪 API Test - Sambi.co</h1>
+    <p>Backend: <strong>https://sambi-be.vercel.app/api</strong></p>
+
+    <!-- Test 1: Get Projects -->
+    <div class="test-section">
+        <h2>1. Test Get Projects (Public)</h2>
+        <button onclick="testGetProjects()">Test GET /api/projects</button>
+        <pre id="result1">Click button to test...</pre>
+    </div>
+
+    <!-- Test 2: Register -->
+    <div class="test-section">
+        <h2>2. Test Register</h2>
+        <input type="text" id="regFullName" placeholder="Full Name" value="Test User">
+        <input type="email" id="regEmail" placeholder="Email" value="241234567890@student.unsika.ac.id">
+        <input type="password" id="regPassword" placeholder="Password" value="Password123!">
+        <select id="regRole" style="width: 100%; padding: 8px; margin: 5px 0;">
+            <option value="mahasiswa">Mahasiswa</option>
+            <option value="klien">Klien</option>
+        </select>
+        <select id="regGender" style="width: 100%; padding: 8px; margin: 5px 0;">
+            <option value="L">Laki-laki</option>
+            <option value="P">Perempuan</option>
+        </select>
+        <button onclick="testRegister()">Test POST /api/auth/register</button>
+        <pre id="result2">Fill form and click button...</pre>
+    </div>
+
+    <!-- Test 3: Login -->
+    <div class="test-section">
+        <h2>3. Test Login</h2>
+        <input type="email" id="loginEmail" placeholder="Email" value="241234567890@student.unsika.ac.id">
+        <input type="password" id="loginPassword" placeholder="Password" value="Password123!">
+        <button onclick="testLogin()">Test POST /api/auth/login</button>
+        <pre id="result3">Fill form and click button...</pre>
+    </div>
+
+    <!-- Test 4: Get Me -->
+    <div class="test-section">
+        <h2>4. Test Get Current User (Requires Login)</h2>
+        <button onclick="testGetMe()">Test GET /api/auth/me</button>
+        <button onclick="clearToken()">Clear Token</button>
+        <pre id="result4">Login first, then click test...</pre>
+    </div>
+
+    <script>
+        const API_BASE = 'https://sambi-be.vercel.app/api';
+        let token = localStorage.getItem('token');
+
+        async function testGetProjects() {
+            const result = document.getElementById('result1');
+            result.textContent = 'Loading...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/projects`);
+                const data = await response.json();
+                
+                result.innerHTML = `<span class="success">✓ SUCCESS</span>\n` + 
+                    `Status: ${response.status}\n` +
+                    JSON.stringify(data, null, 2);
+            } catch (error) {
+                result.innerHTML = `<span class="error">✗ ERROR</span>\n` + error.message;
+            }
+        }
+
+        async function testRegister() {
+            const result = document.getElementById('result2');
+            result.textContent = 'Loading...';
+            
+            const payload = {
+                role: document.getElementById('regRole').value,
+                fullName: document.getElementById('regFullName').value,
+                jenis_kelamin: document.getElementById('regGender').value,
+                email: document.getElementById('regEmail').value,
+                password: document.getElementById('regPassword').value
+            };
+
+            result.innerHTML = `Sending...\nPayload:\n${JSON.stringify(payload, null, 2)}`;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.data && data.data.token) {
+                    localStorage.setItem('token', data.data.token);
+                    token = data.data.token;
+                    result.innerHTML = `<span class="success">✓ SUCCESS - Token saved!</span>\n` + 
+                        `Status: ${response.status}\n` +
+                        JSON.stringify(data, null, 2);
+                } else {
+                    result.innerHTML = `<span class="error">✗ FAILED</span>\n` + 
+                        `Status: ${response.status}\n` +
+                        JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">✗ ERROR</span>\n` + 
+                    `Message: ${error.message}\n` +
+                    `Type: ${error.name}`;
+            }
+        }
+
+        async function testLogin() {
+            const result = document.getElementById('result3');
+            result.textContent = 'Loading...';
+            
+            const payload = {
+                email: document.getElementById('loginEmail').value,
+                password: document.getElementById('loginPassword').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.data && data.data.token) {
+                    localStorage.setItem('token', data.data.token);
+                    token = data.data.token;
+                    result.innerHTML = `<span class="success">✓ SUCCESS - Token saved!</span>\n` + 
+                        `Status: ${response.status}\n` +
+                        JSON.stringify(data, null, 2);
+                } else {
+                    result.innerHTML = `<span class="error">✗ FAILED</span>\n` + 
+                        `Status: ${response.status}\n` +
+                        JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">✗ ERROR</span>\n` + 
+                    `Message: ${error.message}\n` +
+                    `Type: ${error.name}`;
+            }
+        }
+
+        async function testGetMe() {
+            const result = document.getElementById('result4');
+            result.textContent = 'Loading...';
+            
+            token = localStorage.getItem('token');
+            
+            if (!token) {
+                result.innerHTML = `<span class="error">✗ No token found. Please login first.</span>`;
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/me`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                result.innerHTML = `<span class="${data.success ? 'success' : 'error'}">` +
+                    `${data.success ? '✓ SUCCESS' : '✗ FAILED'}</span>\n` + 
+                    `Status: ${response.status}\n` +
+                    JSON.stringify(data, null, 2);
+            } catch (error) {
+                result.innerHTML = `<span class="error">✗ ERROR</span>\n` + error.message;
+            }
+        }
+
+        function clearToken() {
+            localStorage.removeItem('token');
+            token = null;
+            document.getElementById('result4').innerHTML = 'Token cleared! You can test login again.';
+        }
+
+        // Show token status on load
+        window.onload = function() {
+            if (localStorage.getItem('token')) {
+                document.getElementById('result4').innerHTML = 
+                    '<span class="success">Token found in localStorage!</span>\nClick Test to verify.';
+            }
+        };
+    </script>
+</body>
+</html>
+

@@ -1,3 +1,6 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import ClientDashboardLayout from '@/components/layout/ClientDashboardLayout'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
@@ -14,10 +17,49 @@ import {
   Eye,
   MessageCircle
 } from 'lucide-react'
+import { projectsApi, userApi } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function ClientDashboardPage() {
-  // Mock data
-  const stats = [
+  const { user } = useAuth()
+  const [stats, setStats] = useState(null)
+  const [projects, setProjects] = useState([])
+  const [freelancers, setFreelancers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  // Load client dashboard data
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        setLoading(true)
+        
+        // Fetch client stats and projects
+        const [statsData, projectsData] = await Promise.all([
+          userApi.getStats().catch(() => null),
+          projectsApi.getAll({ limit: 3 }).catch(() => [])
+        ])
+        
+        if (statsData) setStats(statsData)
+        if (projectsData) setProjects(Array.isArray(projectsData) ? projectsData : [])
+        
+      } catch (error) {
+        console.error('Failed to load client dashboard:', error)
+        setError(error.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user) {
+      loadDashboard()
+    } else {
+      setLoading(false)
+    }
+  }, [user])
+
+  // Dummy data for fallback
+  const dummyStats = [
     {
       label: 'Total Proyek',
       value: '8',
@@ -122,6 +164,20 @@ export default function ClientDashboardPage() {
     },
   ]
 
+  // Use API data if available, otherwise use dummy data
+  const displayStats = stats || dummyStats
+  const displayProjects = projects.length > 0 ? projects : activeProjects
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Tidak ditentukan'
+    const date = new Date(dateString)
+    // Check if date is valid and not in 1970 or earlier
+    if (isNaN(date.getTime()) || date.getFullYear() < 2000) {
+      return 'Tidak ditentukan'
+    }
+    return date.toLocaleDateString('id-ID')
+  }
+
   return (
     <ClientDashboardLayout 
       title="Dashboard" 
@@ -130,7 +186,7 @@ export default function ClientDashboardPage() {
       <div className="space-y-4 sm:space-y-6">
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-          {stats.map((stat, index) => {
+          {displayStats.map((stat, index) => {
             const Icon = stat.icon
             return (
               <Card key={index} hover className="p-3 sm:p-4 lg:p-6">
@@ -192,7 +248,7 @@ export default function ClientDashboardPage() {
               </div>
 
               <div className="space-y-3 sm:space-y-4">
-                {activeProjects.map((project) => (
+                {displayProjects.map((project) => (
                   <Card key={project.id} className="border border-neutral-200 p-3 sm:p-4">
                     <div className="flex flex-col sm:flex-row items-start justify-between mb-3 gap-2">
                       <div className="flex-1 min-w-0 w-full sm:w-auto">
@@ -229,7 +285,7 @@ export default function ClientDashboardPage() {
                     )}
 
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs sm:text-sm gap-2 mb-3">
-                      <span className="text-neutral-600">Deadline: {new Date(project.deadline).toLocaleDateString('id-ID')}</span>
+                      <span className="text-neutral-600">Deadline: {formatDate(project.deadline)}</span>
                       <span className="font-semibold text-neutral-900">{project.budget}</span>
                     </div>
 
@@ -303,7 +359,7 @@ export default function ClientDashboardPage() {
                     <h4 className="font-medium text-neutral-900 text-xs sm:text-sm mb-1">{item.project}</h4>
                     <p className="text-xs text-neutral-600 mb-2">{item.freelancer}</p>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-neutral-500 truncate">{new Date(item.deadline).toLocaleDateString('id-ID')}</span>
+                      <span className="text-neutral-500 truncate">{formatDate(item.deadline)}</span>
                       <Badge variant={item.daysLeft <= 5 ? 'danger' : 'warning'} size="sm" className="ml-2 whitespace-nowrap">
                         {item.daysLeft} hari lagi
                       </Badge>

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { ArrowLeft } from 'lucide-react'
+import { authApi } from '@/lib/api'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -14,12 +15,14 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'student', // student or client
+    role: 'mahasiswa', // mahasiswa or klien (backend format!)
+    jenis_kelamin: 'L', // L or P
     agreeToTerms: false,
   })
   const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     
     // Validation
@@ -40,9 +43,43 @@ export default function RegisterPage() {
       return
     }
     
-    // TODO: Implement actual registration logic with API
-    // For now, redirect directly to dashboard
-    router.push('/dashboard')
+    // Register with API (sesuai format backend)
+    setLoading(true)
+    try {
+      const response = await authApi.register({
+        role: formData.role,  // "mahasiswa" atau "klien"
+        fullName: formData.fullName,
+        jenis_kelamin: formData.jenis_kelamin,  // "L" atau "P"
+        email: formData.email,
+        password: formData.password
+      })
+      
+      // Store token and user data
+      if (response.token) {
+        localStorage.setItem('token', response.token)
+      }
+      
+      // Backend returns roles_id (1=mahasiswa, 2=klien), map to role string
+      const userData = response.user || response
+      if (userData && userData.roles_id) {
+        userData.role = userData.roles_id === 2 ? 'klien' : 'mahasiswa'
+      }
+      
+      if (userData) {
+        localStorage.setItem('user', JSON.stringify(userData))
+      }
+      
+      // Redirect based on form data role (we know what user selected)
+      if (formData.role === 'klien') {
+        router.push('/client/dashboard')
+      } else {
+        router.push('/dashboard')
+      }
+    } catch (error) {
+      setErrors({ api: error.message || 'Registrasi gagal. Silakan coba lagi.' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleChange = (e) => {
@@ -87,16 +124,16 @@ export default function RegisterPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, role: 'student' }))}
+                  onClick={() => setFormData(prev => ({ ...prev, role: 'mahasiswa' }))}
                   className={`p-4 border-2 rounded-lg transition-all ${
-                    formData.role === 'student'
+                    formData.role === 'mahasiswa'
                       ? 'border-primary-600 bg-primary-50'
                       : 'border-neutral-300 hover:border-neutral-400'
                   }`}
                 >
                   <div className="text-center">
-                    <div className={`text-3xl mb-2 ${formData.role === 'student' ? '' : 'grayscale'}`}>🎓</div>
-                    <div className={`font-semibold ${formData.role === 'student' ? 'text-primary-600' : 'text-neutral-700'}`}>
+                    <div className={`text-3xl mb-2 ${formData.role === 'mahasiswa' ? '' : 'grayscale'}`}>🎓</div>
+                    <div className={`font-semibold ${formData.role === 'mahasiswa' ? 'text-primary-600' : 'text-neutral-700'}`}>
                       Mahasiswa
                     </div>
                     <div className="text-xs text-neutral-500 mt-1">Cari proyek & kerja</div>
@@ -104,16 +141,16 @@ export default function RegisterPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, role: 'client' }))}
+                  onClick={() => setFormData(prev => ({ ...prev, role: 'klien' }))}
                   className={`p-4 border-2 rounded-lg transition-all ${
-                    formData.role === 'client'
+                    formData.role === 'klien'
                       ? 'border-primary-600 bg-primary-50'
                       : 'border-neutral-300 hover:border-neutral-400'
                   }`}
                 >
                   <div className="text-center">
-                    <div className={`text-3xl mb-2 ${formData.role === 'client' ? '' : 'grayscale'}`}>💼</div>
-                    <div className={`font-semibold ${formData.role === 'client' ? 'text-primary-600' : 'text-neutral-700'}`}>
+                    <div className={`text-3xl mb-2 ${formData.role === 'klien' ? '' : 'grayscale'}`}>💼</div>
+                    <div className={`font-semibold ${formData.role === 'klien' ? 'text-primary-600' : 'text-neutral-700'}`}>
                       Klien
                     </div>
                     <div className="text-xs text-neutral-500 mt-1">Post proyek & hire</div>
@@ -141,8 +178,44 @@ export default function RegisterPage() {
               onChange={handleChange}
               error={errors.email}
               placeholder="nama@email.com"
+              helperText={formData.role === 'mahasiswa' ? 'Gunakan email mahasiswa @student.unsika.ac.id' : 'Email aktif Anda'}
               required
             />
+
+            {/* Gender Selection */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-3">
+                Jenis Kelamin <span className="text-danger-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, jenis_kelamin: 'L' }))}
+                  className={`p-3 border-2 rounded-lg transition-all ${
+                    formData.jenis_kelamin === 'L'
+                      ? 'border-primary-600 bg-primary-50'
+                      : 'border-neutral-300 hover:border-neutral-400'
+                  }`}
+                >
+                  <div className={`font-medium ${formData.jenis_kelamin === 'L' ? 'text-primary-600' : 'text-neutral-700'}`}>
+                    👨 Laki-laki
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, jenis_kelamin: 'P' }))}
+                  className={`p-3 border-2 rounded-lg transition-all ${
+                    formData.jenis_kelamin === 'P'
+                      ? 'border-primary-600 bg-primary-50'
+                      : 'border-neutral-300 hover:border-neutral-400'
+                  }`}
+                >
+                  <div className={`font-medium ${formData.jenis_kelamin === 'P' ? 'text-primary-600' : 'text-neutral-700'}`}>
+                    👩 Perempuan
+                  </div>
+                </button>
+              </div>
+            </div>
 
             <Input
               label="Password"
@@ -192,8 +265,14 @@ export default function RegisterPage() {
               )}
             </div>
 
-            <Button type="submit" className="w-full" size="lg">
-              Daftar Sekarang
+            {errors.api && (
+              <div className="p-4 bg-danger-50 border border-danger-200 rounded-lg">
+                <p className="text-sm text-danger-800">{errors.api}</p>
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              {loading ? 'Mendaftar...' : 'Daftar Sekarang'}
             </Button>
           </form>
 

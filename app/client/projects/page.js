@@ -1,19 +1,52 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import ClientDashboardLayout from '@/components/layout/ClientDashboardLayout'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Link from 'next/link'
-import { Search, Filter, Plus, Eye, Users, Calendar } from 'lucide-react'
+import { Search, Filter, Plus, Eye, Users, Calendar, Briefcase } from 'lucide-react'
+import { projectsApi } from '@/lib/api'
 
 export default function ClientProjectsPage() {
+  const [projects, setProjects] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('all')
+
   const tabs = [
-    { id: 'all', label: 'Semua', count: 8 },
-    { id: 'active', label: 'Aktif', count: 3 },
-    { id: 'reviewing', label: 'Menunggu Hire', count: 2 },
-    { id: 'completed', label: 'Selesai', count: 3 },
+    { id: 'all', label: 'Semua', count: 0 },
+    { id: 'active', label: 'Aktif', count: 0 },
+    { id: 'reviewing', label: 'Menunggu Hire', count: 0 },
+    { id: 'completed', label: 'Selesai', count: 0 },
   ]
 
-  const projects = [
+  // Load client's projects
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        setLoading(true)
+        const params = {}
+        if (activeTab !== 'all') {
+          params.status = activeTab
+        }
+        
+        const data = await projectsApi.getAll(params)
+        setProjects(Array.isArray(data) ? data : [])
+      } catch (error) {
+        console.error('Failed to load projects:', error)
+        setError(error.message || 'Gagal memuat proyek')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProjects()
+  }, [activeTab])
+
+  // Dummy projects for fallback
+  const dummyProjects = [
     {
       id: 1,
       title: 'Redesign Website Company Profile',
@@ -84,6 +117,16 @@ export default function ClientProjectsPage() {
       cancelled: { variant: 'neutral', label: 'Dibatalkan' },
     }
     return variants[status] || variants.active
+  }
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Tidak ditentukan'
+    const date = new Date(dateString)
+    // Check if date is valid and not in 1970 or earlier
+    if (isNaN(date.getTime()) || date.getFullYear() < 2000) {
+      return 'Tidak ditentukan'
+    }
+    return date.toLocaleDateString('id-ID')
   }
 
   return (
@@ -178,7 +221,7 @@ export default function ClientProjectsPage() {
                     <div className="flex flex-wrap items-center gap-4 text-sm">
                       <span className="text-neutral-600 flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
-                        Deadline: {new Date(project.deadline).toLocaleDateString('id-ID')}
+                        Deadline: {formatDate(project.deadline)}
                       </span>
                       <span className="font-semibold text-primary-600">{project.budget}</span>
                       {project.status === 'reviewing' && (

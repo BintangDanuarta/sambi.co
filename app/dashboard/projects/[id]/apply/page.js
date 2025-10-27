@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Card from '@/components/ui/Card'
@@ -8,10 +8,13 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Badge from '@/components/ui/Badge'
-import { Upload, X, FileText, CheckCircle, CreditCard, Wallet } from 'lucide-react'
+import { Upload, X, FileText, CheckCircle, CreditCard, Wallet, Loader } from 'lucide-react'
+import { projectsApi, paymentApi } from '@/lib/api'
 
 export default function ApplyProjectPage({ params }) {
   const router = useRouter()
+  const [projectId, setProjectId] = useState(null)
+  const [project, setProject] = useState(null)
   const [step, setStep] = useState(1) // 1: Proposal, 2: Checkout/Payment
   const [proposalData, setProposalData] = useState({
     coverLetter: '',
@@ -20,15 +23,31 @@ export default function ApplyProjectPage({ params }) {
     attachments: [],
   })
   const [paymentMethod, setPaymentMethod] = useState('wallet')
+  const [loading, setLoading] = useState(false)
+  const [loadingProject, setLoadingProject] = useState(true)
+  const [error, setError] = useState('')
 
-  // Mock project data
-  const project = {
-    id: params.id,
-    title: 'Desain UI/UX untuk Aplikasi Mobile Banking',
-    client: 'PT Bank Digital',
-    budget: 'Rp 3.000.000 - Rp 5.000.000',
-    applicationFee: 50000, // Rp 50.000 application fee
-  }
+  // Load params and project data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoadingProject(true)
+        const resolvedParams = await params
+        setProjectId(resolvedParams.id)
+        
+        // Fetch project from API
+        const projectData = await projectsApi.getById(resolvedParams.id)
+        setProject(projectData)
+      } catch (error) {
+        console.error('Failed to load project:', error)
+        setError('Gagal memuat data proyek')
+      } finally {
+        setLoadingProject(false)
+      }
+    }
+    
+    loadData()
+  }, [params])
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files)
@@ -47,13 +66,38 @@ export default function ApplyProjectPage({ params }) {
 
   const handleSubmitProposal = (e) => {
     e.preventDefault()
+    setError('')
     setStep(2) // Move to payment step
   }
 
-  const handlePayment = () => {
-    // TODO: Process payment via API
-    console.log('Processing payment:', paymentMethod)
-    router.push('/dashboard/projects?applied=true')
+  const handlePayment = async () => {
+    if (!projectId) {
+      setError('Project ID tidak ditemukan')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    
+    try {
+      // Submit proposal to project
+      await projectsApi.apply(projectId, {
+        proposal: proposalData.coverLetter,
+        estimatedTime: proposalData.estimatedTime,
+        budget: proposalData.budget,
+      })
+      
+      // Process payment if needed
+      // TODO: Implement payment processing based on payment method
+      // For now, we'll skip the actual payment and just redirect
+      
+      // Success
+      router.push('/dashboard/projects?applied=true')
+    } catch (error) {
+      setError(error.message || 'Gagal mengirim proposal. Silakan coba lagi.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const formatCurrency = (amount) => {
@@ -62,6 +106,31 @@ export default function ApplyProjectPage({ params }) {
       currency: 'IDR',
       minimumFractionDigits: 0,
     }).format(amount)
+  }
+
+  // Loading state
+  if (loadingProject) {
+    return (
+      <DashboardLayout title="Apply Proyek" subtitle="Memuat data proyek...">
+        <div className="flex justify-center items-center py-12">
+          <Loader className="w-8 h-8 animate-spin text-primary-600" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Error or project not found
+  if (!project) {
+    return (
+      <DashboardLayout title="Apply Proyek" subtitle="Proyek tidak ditemukan">
+        <Card className="text-center py-12">
+          <p className="text-neutral-600 mb-4">{error || 'Proyek tidak ditemukan'}</p>
+          <Button variant="outline" onClick={() => router.push('/dashboard/projects/browse')}>
+            Kembali ke Browse Projects
+          </Button>
+        </Card>
+      </DashboardLayout>
+    )
   }
 
   if (step === 2) {
@@ -166,12 +235,18 @@ export default function ApplyProjectPage({ params }) {
                 </div>
               </Card>
 
+              {error && (
+                <div className="p-4 bg-danger-50 border border-danger-200 rounded-lg">
+                  <p className="text-sm text-danger-800">{error}</p>
+                </div>
+              )}
+
               <div className="flex gap-4">
-                <Button variant="ghost" className="flex-1" onClick={() => setStep(1)}>
+                <Button variant="ghost" className="flex-1" onClick={() => setStep(1)} disabled={loading}>
                   Kembali
                 </Button>
-                <Button className="flex-1" onClick={handlePayment}>
-                  Bayar {formatCurrency(project.applicationFee)}
+                <Button className="flex-1" onClick={handlePayment} disabled={loading}>
+                  {loading ? 'Memproses...' : (project.applicationFee ? `Bayar ${formatCurrency(project.applicationFee)}` : 'Kirim Proposal')}
                 </Button>
               </div>
             </div>
@@ -184,41 +259,62 @@ export default function ApplyProjectPage({ params }) {
                 <div className="space-y-4 mb-6 pb-6 border-b border-neutral-200">
                   <div>
                     <p className="text-sm text-neutral-600 mb-1">Proyek</p>
-                    <p className="font-medium text-neutral-900">{project.title}</p>
+                    <p className="font-medium text-neutral-900">{project.title || project.nama_project || 'Untitled'}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-neutral-600 mb-1">Klien</p>
-                    <p className="font-medium text-neutral-900">{project.client}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-neutral-600 mb-1">Budget Proyek</p>
-                    <p className="font-medium text-neutral-900">{project.budget}</p>
-                  </div>
+                  {project.client && (
+                    <div>
+                      <p className="text-sm text-neutral-600 mb-1">Klien</p>
+                      <p className="font-medium text-neutral-900">{project.client}</p>
+                    </div>
+                  )}
+                  {(project.budget || project.budget_min) && (
+                    <div>
+                      <p className="text-sm text-neutral-600 mb-1">Budget Proyek</p>
+                      <p className="font-medium text-neutral-900">
+                        {project.budget || 
+                          (project.budget_min && project.budget_max 
+                            ? `Rp ${project.budget_min.toLocaleString('id-ID')} - Rp ${project.budget_max.toLocaleString('id-ID')}`
+                            : project.budget_min 
+                            ? `Rp ${project.budget_min.toLocaleString('id-ID')}`
+                            : 'Budget belum ditentukan'
+                          )
+                        }
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between">
-                    <span className="text-neutral-600">Application Fee</span>
-                    <span className="font-medium">{formatCurrency(project.applicationFee)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-neutral-600">Biaya Admin</span>
-                    <span className="font-medium">Rp 0</span>
-                  </div>
-                </div>
+                {project.applicationFee ? (
+                  <>
+                    <div className="space-y-3 mb-6">
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600">Application Fee</span>
+                        <span className="font-medium">{formatCurrency(project.applicationFee)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600">Biaya Admin</span>
+                        <span className="font-medium">Rp 0</span>
+                      </div>
+                    </div>
 
-                <div className="pt-4 border-t border-neutral-200">
-                  <div className="flex justify-between items-center mb-6">
-                    <span className="text-lg font-semibold text-neutral-900">Total</span>
-                    <span className="text-2xl font-bold text-primary-600">
-                      {formatCurrency(project.applicationFee)}
-                    </span>
-                  </div>
-                </div>
+                    <div className="pt-4 border-t border-neutral-200">
+                      <div className="flex justify-between items-center mb-6">
+                        <span className="text-lg font-semibold text-neutral-900">Total</span>
+                        <span className="text-2xl font-bold text-primary-600">
+                          {formatCurrency(project.applicationFee)}
+                        </span>
+                      </div>
+                    </div>
 
-                <Badge variant="warning" className="w-full justify-center">
-                  💡 Fee dikembalikan jika ditolak
-                </Badge>
+                    <Badge variant="warning" className="w-full justify-center">
+                      💡 Fee dikembalikan jika ditolak
+                    </Badge>
+                  </>
+                ) : (
+                  <p className="text-sm text-neutral-600 text-center py-4">
+                    Tidak ada biaya aplikasi untuk proyek ini
+                  </p>
+                )}
               </Card>
             </div>
           </div>
@@ -231,10 +327,23 @@ export default function ApplyProjectPage({ params }) {
     <DashboardLayout title="Apply Proyek" subtitle="Kirim proposal Anda untuk proyek ini">
       <div className="max-w-4xl mx-auto">
         <Card className="mb-6">
-          <h2 className="text-xl font-semibold text-neutral-900 mb-4">{project.title}</h2>
+          <h2 className="text-xl font-semibold text-neutral-900 mb-4">
+            {project.title || project.nama_project || 'Untitled Project'}
+          </h2>
           <div className="flex items-center gap-4 text-sm">
-            <Badge variant="neutral">{project.client}</Badge>
-            <span className="text-neutral-600">Budget: {project.budget}</span>
+            {project.client && <Badge variant="neutral">{project.client}</Badge>}
+            {(project.budget || project.budget_min) && (
+              <span className="text-neutral-600">
+                Budget: {project.budget || 
+                  (project.budget_min && project.budget_max 
+                    ? `Rp ${project.budget_min.toLocaleString('id-ID')} - Rp ${project.budget_max.toLocaleString('id-ID')}`
+                    : project.budget_min 
+                    ? `Rp ${project.budget_min.toLocaleString('id-ID')}`
+                    : 'Belum ditentukan'
+                  )
+                }
+              </span>
+            )}
           </div>
         </Card>
 

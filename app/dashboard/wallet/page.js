@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
@@ -15,21 +15,54 @@ import {
   CreditCard,
   Download,
   Eye,
-  EyeOff
+  EyeOff,
+  Loader
 } from 'lucide-react'
+import { walletApi } from '@/lib/api'
 
 export default function WalletPage() {
   const [showBalance, setShowBalance] = useState(true)
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
   const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [balance, setBalance] = useState(null)
+  const [transactions, setTransactions] = useState([])
+  const [bankAccounts, setBankAccounts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [withdrawing, setWithdrawing] = useState(false)
 
-  const balance = {
+  useEffect(() => {
+    loadWalletData()
+  }, [])
+
+  const loadWalletData = async () => {
+    try {
+      setLoading(true)
+      const [balanceData, transactionsData, accountsData] = await Promise.all([
+        walletApi.getBalance().catch(() => null),
+        walletApi.getTransactions({ limit: 10 }).catch(() => []),
+        walletApi.getBankAccounts().catch(() => [])
+      ])
+      
+      if (balanceData) setBalance(balanceData)
+      setTransactions(Array.isArray(transactionsData) ? transactionsData : [])
+      setBankAccounts(Array.isArray(accountsData) ? accountsData : [])
+    } catch (error) {
+      console.error('Failed to load wallet data:', error)
+      setError(error.message || 'Gagal memuat data wallet')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Dummy data for fallback
+  const dummyBalance = {
     total: 5250000,
     pending: 1500000,
     available: 3750000,
   }
 
-  const transactions = [
+  const dummyTransactions = [
     {
       id: 1,
       type: 'income',
@@ -76,28 +109,63 @@ export default function WalletPage() {
     }).format(amount)
   }
 
-  const handleWithdraw = () => {
-    // TODO: Implement withdrawal API
-    console.log('Withdraw:', withdrawAmount)
-    setIsWithdrawModalOpen(false)
-    setWithdrawAmount('')
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || parseFloat(withdrawAmount) < 50000) {
+      return
+    }
+    
+    const primaryAccount = bankAccounts.find(acc => acc.is_primary) || bankAccounts[0]
+    if (!primaryAccount) {
+      alert('Tambahkan rekening bank terlebih dahulu')
+      return
+    }
+
+    try {
+      setWithdrawing(true)
+      await walletApi.withdraw(parseFloat(withdrawAmount), primaryAccount.id)
+      alert('Penarikan berhasil! Dana akan diproses dalam 1-3 hari kerja.')
+      setIsWithdrawModalOpen(false)
+      setWithdrawAmount('')
+      loadWalletData() // Reload data
+    } catch (error) {
+      alert(error.message || 'Gagal melakukan penarikan')
+    } finally {
+      setWithdrawing(false)
+    }
   }
+
+  const displayBalance = balance || dummyBalance
+  const displayTransactions = transactions.length > 0 ? transactions : dummyTransactions
 
   return (
     <DashboardLayout title="Dompet" subtitle="Kelola penghasilan dan penarikan dana">
-      <div className="space-y-6">
-        {/* Balance Cards */}
-        <div className="grid md:grid-cols-3 gap-6">
-          <Card className="bg-gradient-to-br from-primary-600 to-primary-700 text-white">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="text-primary-100 text-sm mb-1">Total Saldo</p>
-                <div className="flex items-center gap-2">
-                  {showBalance ? (
-                    <h3 className="text-3xl font-bold">{formatCurrency(balance.total)}</h3>
-                  ) : (
-                    <h3 className="text-3xl font-bold">Rp ••••••</h3>
-                  )}
+      {loading && (
+        <div className="flex justify-center items-center py-12">
+          <Loader className="w-8 h-8 animate-spin text-primary-600" />
+        </div>
+      )}
+
+      {!loading && (
+        <div className="space-y-6">
+          {/* Error State */}
+          {error && (
+            <Card className="bg-red-50 border-red-200">
+              <p className="text-red-600 text-sm">{error}</p>
+            </Card>
+          )}
+
+          {/* Balance Cards */}
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card className="bg-gradient-to-br from-primary-600 to-primary-700 text-white">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="text-primary-100 text-sm mb-1">Total Saldo</p>
+                  <div className="flex items-center gap-2">
+                    {showBalance ? (
+                      <h3 className="text-3xl font-bold">{formatCurrency(displayBalance.total)}</h3>
+                    ) : (
+                      <h3 className="text-3xl font-bold">Rp ••••••</h3>
+                    )}
                   <button
                     onClick={() => setShowBalance(!showBalance)}
                     className="p-1 hover:bg-primary-500 rounded transition-colors"
@@ -121,7 +189,7 @@ export default function WalletPage() {
               <div>
                 <p className="text-neutral-500 text-sm mb-1">Saldo Tersedia</p>
                 <h3 className="text-2xl font-bold text-neutral-900">
-                  {showBalance ? formatCurrency(balance.available) : 'Rp ••••••'}
+                  {showBalance ? formatCurrency(displayBalance.available) : 'Rp ••••••'}
                 </h3>
               </div>
               <div className="p-3 bg-success-100 rounded-lg">
@@ -143,7 +211,7 @@ export default function WalletPage() {
               <div>
                 <p className="text-neutral-500 text-sm mb-1">Dana Pending</p>
                 <h3 className="text-2xl font-bold text-neutral-900">
-                  {showBalance ? formatCurrency(balance.pending) : 'Rp ••••••'}
+                  {showBalance ? formatCurrency(displayBalance.pending) : 'Rp ••••••'}
                 </h3>
               </div>
               <div className="p-3 bg-warning-100 rounded-lg">
@@ -165,7 +233,7 @@ export default function WalletPage() {
           </div>
 
           <div className="space-y-4">
-            {transactions.map((transaction) => (
+            {displayTransactions.map((transaction) => (
               <div
                 key={transaction.id}
                 className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
@@ -210,7 +278,7 @@ export default function WalletPage() {
           </div>
 
           {/* Empty State */}
-          {transactions.length === 0 && (
+          {displayTransactions.length === 0 && (
             <div className="text-center py-12">
               <div className="w-20 h-20 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Wallet className="w-10 h-10 text-neutral-400" />
@@ -247,7 +315,8 @@ export default function WalletPage() {
             </div>
           </div>
         </Card>
-      </div>
+        </div>
+      )}
 
       {/* Withdrawal Modal */}
       <Modal
@@ -259,8 +328,8 @@ export default function WalletPage() {
             <Button variant="ghost" onClick={() => setIsWithdrawModalOpen(false)}>
               Batal
             </Button>
-            <Button onClick={handleWithdraw} disabled={!withdrawAmount || parseFloat(withdrawAmount) > balance.available}>
-              Tarik Dana
+            <Button onClick={handleWithdraw} disabled={withdrawing || !withdrawAmount || parseFloat(withdrawAmount) > displayBalance.available}>
+              {withdrawing ? 'Memproses...' : 'Tarik Dana'}
             </Button>
           </>
         }
@@ -268,7 +337,7 @@ export default function WalletPage() {
         <div className="space-y-4">
           <div className="p-4 bg-neutral-50 rounded-lg">
             <p className="text-sm text-neutral-600 mb-1">Saldo Tersedia</p>
-            <p className="text-2xl font-bold text-neutral-900">{formatCurrency(balance.available)}</p>
+            <p className="text-2xl font-bold text-neutral-900">{formatCurrency(displayBalance.available)}</p>
           </div>
 
           <Input
@@ -277,7 +346,7 @@ export default function WalletPage() {
             value={withdrawAmount}
             onChange={(e) => setWithdrawAmount(e.target.value)}
             placeholder="Masukkan jumlah"
-            helperText={`Minimal Rp 50.000 • Maksimal ${formatCurrency(balance.available)}`}
+            helperText={`Minimal Rp 50.000 • Maksimal ${formatCurrency(displayBalance.available)}`}
           />
 
           <div className="p-4 bg-primary-50 border border-primary-200 rounded-lg">

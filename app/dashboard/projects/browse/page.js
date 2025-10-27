@@ -1,21 +1,74 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Link from 'next/link'
 import { Search, Filter, Clock, Users, Briefcase } from 'lucide-react'
+import { projectsApi } from '@/lib/api'
 
 export default function BrowseProjectsPage() {
+  const [projects, setProjects] = useState([])
+  const [appliedProjectIds, setAppliedProjectIds] = useState(new Set())
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
+
   const categories = [
-    { id: 'all', label: 'Semua', count: 45 },
-    { id: 'design', label: 'Design', count: 12 },
-    { id: 'development', label: 'Development', count: 15 },
-    { id: 'writing', label: 'Writing', count: 8 },
-    { id: 'marketing', label: 'Marketing', count: 6 },
-    { id: 'video', label: 'Video', count: 4 },
+    { id: 'all', label: 'Semua', count: 0 },
+    { id: 'design', label: 'Design', count: 0 },
+    { id: 'development', label: 'Development', count: 0 },
+    { id: 'writing', label: 'Writing', count: 0 },
+    { id: 'marketing', label: 'Marketing', count: 0 },
+    { id: 'video', label: 'Video', count: 0 },
   ]
 
-  const projects = [
+  // Load projects and user's applications
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        setError('')
+        
+        // Build params for projects
+        const params = {}
+        if (selectedCategory !== 'all') {
+          params.category = selectedCategory
+        }
+        if (searchQuery) {
+          params.search = searchQuery
+        }
+        
+        // Fetch projects and applications in parallel
+        const [projectsData, applicationsData] = await Promise.all([
+          projectsApi.getAll(params).catch(() => []),
+          projectsApi.getMyApplications().catch(() => [])
+        ])
+        
+        setProjects(projectsData || [])
+        
+        // Build Set of applied project IDs for O(1) lookup
+        const appliedIds = new Set(
+          (applicationsData || []).map(app => app.project_id || app.id)
+        )
+        setAppliedProjectIds(appliedIds)
+        
+      } catch (error) {
+        console.error('Failed to load data:', error)
+        setError(error.message || 'Gagal memuat data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [selectedCategory, searchQuery])
+
+  // Dummy projects for fallback
+  const dummyProjects = [
     {
       id: 1,
       title: 'Desain UI/UX untuk Aplikasi Mobile Banking',
@@ -95,6 +148,8 @@ export default function BrowseProjectsPage() {
                 type="text"
                 placeholder="Cari proyek berdasarkan judul, kategori, atau skill..."
                 className="bg-transparent border-none outline-none flex-1 text-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
             <div className="flex gap-2">
@@ -114,13 +169,14 @@ export default function BrowseProjectsPage() {
           {categories.map((category) => (
             <button
               key={category.id}
+              onClick={() => setSelectedCategory(category.id)}
               className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors
-                ${category.id === 'all' 
+                ${category.id === selectedCategory 
                   ? 'bg-primary-600 text-white' 
                   : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
                 }`}
             >
-              {category.label} ({category.count})
+              {category.label}
             </button>
           ))}
         </div>
@@ -128,73 +184,159 @@ export default function BrowseProjectsPage() {
         {/* Results Info */}
         <div className="flex items-center justify-between">
           <p className="text-neutral-600">
-            Menampilkan <span className="font-semibold">{projects.length}</span> proyek
+            {loading ? 'Memuat...' : `Menampilkan ${projects.length} proyek`}
           </p>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <Card>
+            <div className="text-center py-8">
+              <p className="text-danger-600 mb-2">{error}</p>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Coba Lagi
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {/* Loading State */}
+        {loading && !error && (
+          <div className="grid gap-6">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <div className="animate-pulse">
+                  <div className="h-6 bg-neutral-200 rounded w-3/4 mb-4"></div>
+                  <div className="h-4 bg-neutral-200 rounded w-full mb-2"></div>
+                  <div className="h-4 bg-neutral-200 rounded w-5/6"></div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
         {/* Projects Grid */}
-        <div className="grid gap-6">
-          {projects.map((project) => (
+        {!loading && !error && (
+          <div className="grid gap-6">
+            {projects.length === 0 ? (
+              <Card>
+                <div className="text-center py-12">
+                  <Briefcase className="w-16 h-16 text-neutral-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                    Tidak Ada Proyek
+                  </h3>
+                  <p className="text-neutral-600">
+                    Belum ada proyek yang tersedia saat ini. Coba lagi nanti.
+                  </p>
+                </div>
+              </Card>
+            ) : (
+              projects.map((project) => (
             <Card key={project.id} hover>
               <div className="space-y-4">
                 {/* Header */}
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <Link href={`/dashboard/projects/browse/${project.id}`}>
+                    <Link href={`/dashboard/projects/${project.id}`}>
                       <h3 className="text-xl font-semibold text-neutral-900 hover:text-primary-600 transition-colors mb-2">
-                        {project.title}
+                        {project.title || project.nama_project || 'Untitled Project'}
                       </h3>
                     </Link>
                     <div className="flex items-center gap-3 text-sm text-neutral-600">
-                      <span className="font-medium">{project.client}</span>
-                      <span className="flex items-center gap-1">
-                        ⭐ {project.clientRating}
-                      </span>
+                      {project.client && <span className="font-medium">{project.client}</span>}
+                      {project.clientRating && (
+                        <span className="flex items-center gap-1">
+                          ⭐ {project.clientRating}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <Badge variant="neutral">{project.category}</Badge>
+                  {project.category && <Badge variant="neutral">{project.category}</Badge>}
                 </div>
 
                 {/* Description */}
-                <p className="text-neutral-600 leading-relaxed">{project.description}</p>
+                <p className="text-neutral-600 leading-relaxed">
+                  {project.description || project.deskripsi || 'Tidak ada deskripsi'}
+                </p>
 
                 {/* Skills */}
-                <div className="flex flex-wrap gap-2">
-                  {project.skills.map((skill, index) => (
-                    <Badge key={index} variant="primary" size="sm">
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
+                {project.skills && project.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {project.skills.map((skill, index) => (
+                      <Badge key={index} variant="primary" size="sm">
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {(!project.skills || project.skills.length === 0) && project.category && (
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="primary" size="sm">{project.category}</Badge>
+                  </div>
+                )}
 
                 {/* Footer Info */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-neutral-200">
                   <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-600">
-                    <span className="font-semibold text-primary-600 text-lg">
-                      {project.budget}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      {project.duration}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      {project.proposals} proposal
-                    </span>
-                    <span className="text-neutral-500">
-                      {project.posted}
-                    </span>
+                    {(project.budget || project.budget_min) && (
+                      <span className="font-semibold text-primary-600 text-lg">
+                        {project.budget || 
+                          (project.budget_min && project.budget_max 
+                            ? `Rp ${project.budget_min.toLocaleString('id-ID')} - Rp ${project.budget_max.toLocaleString('id-ID')}`
+                            : project.budget_min 
+                            ? `Rp ${project.budget_min.toLocaleString('id-ID')}`
+                            : 'Budget belum ditentukan'
+                          )
+                        }
+                      </span>
+                    )}
+                    {project.duration && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        {project.duration}
+                      </span>
+                    )}
+                    {project.deadline && !project.duration && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        {new Date(project.deadline).toLocaleDateString('id-ID')}
+                      </span>
+                    )}
+                    {project.proposals > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        {project.proposals} proposal
+                      </span>
+                    )}
+                    {project.posted && (
+                      <span className="text-neutral-500">
+                        {project.posted}
+                      </span>
+                    )}
+                    {project.created_at && !project.posted && (
+                      <span className="text-neutral-500">
+                        {new Date(project.created_at).toLocaleDateString('id-ID')}
+                      </span>
+                    )}
                   </div>
-                  <Link href={`/dashboard/projects/browse/${project.id}/apply`}>
-                    <Button>
-                      Apply Sekarang
+                  {appliedProjectIds.has(project.id) ? (
+                    <Button variant="outline" disabled>
+                      ✓ Sudah Apply
                     </Button>
-                  </Link>
+                  ) : (
+                    <Link href={`/dashboard/projects/${project.id}/apply`}>
+                      <Button>
+                        Apply Sekarang
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             </Card>
-          ))}
-        </div>
+              ))
+            )}
+          </div>
+        )}
 
         {/* Load More */}
         <div className="flex justify-center">
