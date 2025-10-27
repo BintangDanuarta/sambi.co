@@ -49,7 +49,7 @@ CURRENT_*.md
 MISSING_*.md
 FINAL_*.md
 
-# markdown folder
+/backend/
 /markdown/
 FIXES_*.md
 UPLOAD_*.md

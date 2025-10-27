@@ -22,7 +22,9 @@ import {
   Loader,
   Star,
   Mail,
-  Phone
+  Phone,
+  Wallet,
+  CreditCard
 } from 'lucide-react'
 import { projectsApi } from '@/lib/api'
 
@@ -37,6 +39,7 @@ export default function ClientProjectDetailPage({ params }) {
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState('wallet')
 
   // Load project and proposals
   useEffect(() => {
@@ -71,7 +74,20 @@ export default function ClientProjectDetailPage({ params }) {
     
     setActionLoading(true)
     try {
-      await projectsApi.acceptProposal(projectId, selectedProposal.id)
+      // Calculate total payment (budget + 10% platform fee)
+      const totalPayment = (selectedProposal.budget || 0) * 1.1
+      
+      // Accept proposal with payment info
+      await projectsApi.acceptProposal(projectId, selectedProposal.id, {
+        paymentMethod,
+        amount: totalPayment,
+        budget: selectedProposal.budget,
+        platformFee: (selectedProposal.budget || 0) * 0.1
+      })
+      
+      // Show success message
+      alert(`✓ Proposal diterima! Dana ${formatCurrency(totalPayment)} telah didebit dan ditahan di escrow. Freelancer akan diberitahu.`)
+      
       // Reload data
       const [projectData, proposalsData] = await Promise.all([
         projectsApi.getById(projectId),
@@ -81,8 +97,9 @@ export default function ClientProjectDetailPage({ params }) {
       setProposals(Array.isArray(proposalsData) ? proposalsData : [])
       setIsAcceptModalOpen(false)
       setSelectedProposal(null)
+      setPaymentMethod('wallet')
     } catch (error) {
-      alert(error.message || 'Gagal menerima proposal')
+      alert(error.message || 'Gagal memproses payment dan menerima proposal')
     } finally {
       setActionLoading(false)
     }
@@ -425,16 +442,17 @@ export default function ClientProjectDetailPage({ params }) {
         </div>
       </div>
 
-      {/* Accept Proposal Modal */}
+      {/* Accept Proposal Modal with Payment */}
       <Modal
         isOpen={isAcceptModalOpen}
         onClose={() => {
           if (!actionLoading) {
             setIsAcceptModalOpen(false)
             setSelectedProposal(null)
+            setPaymentMethod('wallet')
           }
         }}
-        title="Terima Proposal"
+        title="Hire Freelancer & Payment"
         footer={
           <>
             <Button 
@@ -442,30 +460,134 @@ export default function ClientProjectDetailPage({ params }) {
               onClick={() => {
                 setIsAcceptModalOpen(false)
                 setSelectedProposal(null)
+                setPaymentMethod('wallet')
               }}
               disabled={actionLoading}
             >
               Batal
             </Button>
             <Button onClick={handleAcceptProposal} disabled={actionLoading}>
-              {actionLoading ? 'Memproses...' : 'Ya, Terima Proposal'}
+              {actionLoading ? 'Memproses...' : (selectedProposal?.budget ? `Bayar ${formatCurrency(selectedProposal.budget)}` : 'Terima & Bayar')}
             </Button>
           </>
         }
       >
         {selectedProposal && (
           <div className="space-y-4">
-            <p className="text-neutral-600">
-              Anda yakin ingin menerima proposal dari <strong>{selectedProposal.student_name}</strong>?
-            </p>
+            {/* Freelancer Info */}
+            <div className="p-4 bg-neutral-50 rounded-lg">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white font-semibold">
+                  {selectedProposal.student_name?.substring(0, 2).toUpperCase() || 'ST'}
+                </div>
+                <div>
+                  <h4 className="font-semibold text-neutral-900">{selectedProposal.student_name}</h4>
+                  <div className="flex items-center gap-2 text-sm text-neutral-600">
+                    <Star className="w-4 h-4 text-warning-500" />
+                    <span>{selectedProposal.student_rating || '5.0'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-3 text-sm">
+                <div>
+                  <p className="text-neutral-500">Estimasi Waktu</p>
+                  <p className="font-semibold text-neutral-900">{selectedProposal.estimated_time || '-'} hari</p>
+                </div>
+                <div>
+                  <p className="text-neutral-500">Budget</p>
+                  <p className="font-semibold text-primary-600">{formatCurrency(selectedProposal.budget || 0)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Method Selection */}
+            <div>
+              <h4 className="font-semibold text-neutral-900 mb-3">Pilih Metode Pembayaran</h4>
+              <div className="space-y-2">
+                {/* Wallet */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('wallet')}
+                  className={`w-full p-3 border-2 rounded-lg transition-all text-left ${
+                    paymentMethod === 'wallet'
+                      ? 'border-primary-600 bg-primary-50'
+                      : 'border-neutral-300 hover:border-neutral-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      paymentMethod === 'wallet' ? 'bg-primary-600' : 'bg-neutral-200'
+                    }`}>
+                      <Wallet className={`w-5 h-5 ${paymentMethod === 'wallet' ? 'text-white' : 'text-neutral-600'}`} />
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="font-semibold text-neutral-900 text-sm">Sambi Wallet</h5>
+                      <p className="text-xs text-neutral-600">Saldo tersedia untuk pembayaran</p>
+                    </div>
+                    {paymentMethod === 'wallet' && (
+                      <CheckCircle className="w-5 h-5 text-primary-600" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Bank Transfer */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('bank')}
+                  className={`w-full p-3 border-2 rounded-lg transition-all text-left ${
+                    paymentMethod === 'bank'
+                      ? 'border-primary-600 bg-primary-50'
+                      : 'border-neutral-300 hover:border-neutral-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      paymentMethod === 'bank' ? 'bg-primary-600' : 'bg-neutral-200'
+                    }`}>
+                      <CreditCard className={`w-5 h-5 ${paymentMethod === 'bank' ? 'text-white' : 'text-neutral-600'}`} />
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="font-semibold text-neutral-900 text-sm">Transfer Bank</h5>
+                      <p className="text-xs text-neutral-600">BCA, Mandiri, BNI, BRI</p>
+                    </div>
+                    {paymentMethod === 'bank' && (
+                      <CheckCircle className="w-5 h-5 text-primary-600" />
+                    )}
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Payment Info */}
             <div className="p-4 bg-primary-50 border border-primary-200 rounded-lg">
-              <h4 className="font-semibold text-primary-900 mb-2">Yang perlu Anda lakukan:</h4>
+              <h4 className="font-semibold text-primary-900 mb-2 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5" />
+                Pembayaran Aman
+              </h4>
               <ul className="space-y-1 text-sm text-primary-800">
-                <li>✓ Mahasiswa akan diberitahu bahwa proposal diterima</li>
-                <li>✓ Anda dapat mulai berkomunikasi via chat</li>
-                <li>✓ Proyek akan berstatus "Sedang Berjalan"</li>
+                <li>✓ Dana akan ditahan di escrow hingga proyek selesai</li>
+                <li>✓ Freelancer dibayar setelah deliverables diterima</li>
+                <li>✓ Refund 100% jika freelancer tidak deliver</li>
                 <li>✓ Proposal lainnya akan otomatis ditolak</li>
               </ul>
+            </div>
+
+            {/* Breakdown */}
+            <div className="border-t pt-3">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-neutral-600">Budget Proyek</span>
+                <span className="font-semibold">{formatCurrency(selectedProposal.budget || 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-neutral-600">Platform Fee (10%)</span>
+                <span className="font-semibold">{formatCurrency((selectedProposal.budget || 0) * 0.1)}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2">
+                <span className="font-bold text-neutral-900">Total Pembayaran</span>
+                <span className="font-bold text-primary-600 text-lg">
+                  {formatCurrency((selectedProposal.budget || 0) * 1.1)}
+                </span>
+              </div>
             </div>
           </div>
         )}
